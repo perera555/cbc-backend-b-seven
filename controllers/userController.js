@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 
 
 
+
 export function createUser(req, res) {
     const hashedPassword = bcrypt.hashSync(req.body.Password, 10);
 
