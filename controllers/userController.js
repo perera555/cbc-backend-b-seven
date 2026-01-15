@@ -6,14 +6,14 @@ import jwt from "jsonwebtoken";
 
 
 export function createUser(req, res) {
-    const hashedPassword = bcrypt.hashSync(req.body.Password, 10);
+    const hashedpassword = bcrypt.hashSync(req.body.password, 10);
 
     const user = new User(
         {
             email: req.body.email,
             firstName: req.body.firstName,
             lastName: req.body.lastName,
-            Password: hashedPassword,
+            password: hashedpassword,
             role: req.body.role
 
         }
@@ -33,6 +33,21 @@ export function createUser(req, res) {
 
 
 }
+export function getUsers(req, res) {
+    User.find().then((users) => {
+        res.json(users)
+
+    })
+
+        .catch(() => {
+            res.status(500).json({
+                message: "Error retrieving user data"
+            })
+
+        })
+
+
+}
 
 export function loginUser(req, res) {
 
@@ -48,8 +63,8 @@ export function loginUser(req, res) {
                 }
                 )
             } else {
-                const isPasswordMatching = bcrypt.compareSync(req.body.Password, user.Password);
-                if (isPasswordMatching) {
+              const isPasswordMatching = bcrypt.compareSync(req.body.password, user.password)
+            if (isPasswordMatching)  {
                     //Authorization and Authentication
                     // this is authorization part
                     // create token & encrypted with secret key( "jwt-secret")
@@ -60,7 +75,7 @@ export function loginUser(req, res) {
                         role: user.role,
                         isEmailVerified: user.isEmailVerified,
                     },
-                        "jwt-secret"
+                        process.env.JWT_SECRET
 
 
                     )

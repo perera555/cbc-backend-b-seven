@@ -31,7 +31,7 @@ const userSchema = new mongoose.Schema(
             required: true,
             default: "user"
         },
-        isBlocked: {
+        isblocked: {
             type: Boolean,
             default: false
         },

@@ -4,9 +4,12 @@ import studentRouter from './routes/studentsRouter.js';
 import userRouter from './routes/userRouter.js';
 import jwt from 'jsonwebtoken';
 import productRouter from './routes/productRouter.js';
-import  cors from "cors";
+import reviewRouter from './routes/reviewRouter.js';
+import cors from "cors";
+import dotenv from 'dotenv';
 
 
+dotenv.config();
 const app = express();
 app.use(cors())
 //middleware to parse json data
@@ -22,7 +25,7 @@ app.use(
         if (token != null) {
             token = token.replace("Bearer ", "");
             console.log(token)
-            jwt.verify(token, "jwt-secret",
+            jwt.verify(token, process.env.JWT_SECRET,
                 (err, decoded) => {
 
                     if (decoded == null) {
@@ -33,7 +36,7 @@ app.use(
                     } else {
                         console.log(decoded)
                         req.user = decoded;
-                        
+
                     }
                 }) // decrypt the token
         }
@@ -41,15 +44,15 @@ app.use(
     }
 )
 
-const connectionString = "mongodb+srv://admin:123@cluster0.jp8j6vo.mongodb.net/?appName=Cluster0"
+const connectionString = process.env.MONGO_URI
 mongoose.connect(connectionString)
     .then(
         () => {
             console.log("Connected to the database successfully");
 
         })
-    .catch(() => {
-        console.log("Error connecting to the database");
+    .catch((err) => {
+        console.log("Error connecting to the database",err);
 
     })
 
@@ -57,6 +60,8 @@ mongoose.connect(connectionString)
 app.use('/students', studentRouter);
 app.use('/users', userRouter);
 app.use('/products', productRouter);
+app.use('/reviews', reviewRouter);
+
 
 app.listen(3000,
     () => {
