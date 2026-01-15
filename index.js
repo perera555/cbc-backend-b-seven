@@ -57,10 +57,10 @@ mongoose.connect(connectionString)
     })
 
 
-app.use('/students', studentRouter);
-app.use('/users', userRouter);
-app.use('/products', productRouter);
-app.use('/reviews', reviewRouter);
+app.use('/api/students', studentRouter);
+app.use('/api/users', userRouter);
+app.use('/api/products', productRouter);
+app.use('/api/reviews', reviewRouter);
 
 
 app.listen(3000,

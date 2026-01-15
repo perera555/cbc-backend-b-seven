@@ -63,8 +63,8 @@ export function loginUser(req, res) {
                 }
                 )
             } else {
-              const isPasswordMatching = bcrypt.compareSync(req.body.password, user.password)
-            if (isPasswordMatching)  {
+                const isPasswordMatching = bcrypt.compareSync(req.body.password, user.password)
+                if (isPasswordMatching) {
                     //Authorization and Authentication
                     // this is authorization part
                     // create token & encrypted with secret key( "jwt-secret")
@@ -81,7 +81,15 @@ export function loginUser(req, res) {
                     )
                     res.status(200).json({
                         message: " login successful",
-                        token: token
+                        token: token,
+                        user: {
+                            email: user.email,
+                            firstName: user.firstName,
+                            lastName: user.lastName,
+                            role: user.role,
+                            isEmailVerified: user.isEmailVerified,
+
+                        }
 
 
                     }
@@ -103,23 +111,23 @@ export function loginUser(req, res) {
 
 }
 
-export function isAdmin(req){
-     if (req.user == null) {
+export function isAdmin(req) {
+    if (req.user == null) {
         return false;
-        }
-        
+    }
+
     if (req.user.role != "admin") {
         return false;
-     
+
     }
     return true;
 
 }
 
-export function isCustomer(req){
+export function isCustomer(req) {
     if (req.user == null) {
-       return false;
-       }
+        return false;
+    }
     if (req.user.role != "user") {
         return false;
     }
