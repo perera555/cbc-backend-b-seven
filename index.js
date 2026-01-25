@@ -1,74 +1,91 @@
 import express from 'express';
 import mongoose from 'mongoose';
-import studentRouter from './routes/studentsRouter.js';
-import userRouter from './routes/userRouter.js';
 import jwt from 'jsonwebtoken';
-import productRouter from './routes/productRouter.js';
-import reviewRouter from './routes/reviewRouter.js';
 import cors from "cors";
 import dotenv from 'dotenv';
-import orderRouter from './routes/orderRouter.js';
 
+import studentRouter from './routes/studentsRouter.js';
+import userRouter from './routes/userRouter.js';
+import productRouter from './routes/productRouter.js';
+import reviewRouter from './routes/reviewRouter.js';
+import orderRouter from './routes/orderRouter.js';
 
 dotenv.config();
 const app = express();
-app.use(cors())
-//middleware to parse json data
+
+app.use(cors());
 app.use(express.json());
 
+/* ================= AUTH (UNCHANGED) ================= */
+app.use((req, res, next) => {
+    let token = req.header('Authorization');
 
-//middleware to log http requests
-//Authentication 
-app.use(
-    (req, res, next) => {
-        let token = req.header('Authorization');
-
-        if (token != null) {
-            token = token.replace("Bearer ", "");
-            console.log(token)
-            jwt.verify(token, process.env.JWT_SECRET,
-                (err, decoded) => {
-
-                    if (decoded == null) {
-                        res.status(401).json({
-                            message: "Invalid Token please login again"
-                        })
-                        return
-                    } else {
-                        console.log(decoded)
-                        req.user = decoded;
-
-                    }
-                }) // decrypt the token
-        }
-        next();
+    if (token) {
+        token = token.replace("Bearer ", "");
+        jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+            if (decoded == null) {
+                return res.status(401).json({
+                    message: "Invalid Token please login again"
+                });
+            }
+            req.user = decoded;
+        });
     }
-)
+    next();
+});
 
-const connectionString = process.env.MONGO_URI
-mongoose.connect(connectionString)
-    .then(
-        () => {
-            console.log("Connected to the database successfully");
+/* ================= MIDDLEWARE ================= */
+function userContext(req, res, next) {
+    if (!req.user) {
+        return res.status(401).json({
+            message: "Unauthorized – please login"
+        });
+    }
+    next();
+}
 
-        })
-    .catch((err) => {
-        console.log("Error connecting to the database",err);
+function adminOnly(req, res, next) {
+    if (!req.user) {
+        return res.status(401).json({
+            message: "Unauthorized – please login"
+        });
+    }
+    if (req.user.role !== "admin") {
+        return res.status(403).json({
+            message: "Access denied – admin only"
+        });
+    }
+    next();
+}
 
-    })
+/* ================= DATABASE ================= */
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log("Connected to the database successfully"))
+    .catch(err => console.log("DB Error", err));
 
+/* ================= ROUTES ================= */
 
-app.use('/api/students', studentRouter);
+// users
 app.use('/api/users', userRouter);
-app.use('/api/products', productRouter);
+
+// students (logged users)
+app.use('/api/students', userContext, studentRouter);
+
+// products
+app.use('/api/products', (req, res, next) => {
+    if (req.method === "GET") {
+        return next(); // public
+    }
+    return adminOnly(req, res, next); // admin only
+}, productRouter);
+
+// orders (logged users)
+app.use('/api/orders', userContext, orderRouter);
+
+// reviews (public)
 app.use('/api/reviews', reviewRouter);
-app.use("/api/orders", orderRouter);
 
-
-app.listen(3000,
-    () => {
-        console.log("Server is running on port 3000");
-
-
-
-    }); 
+/* ================= SERVER ================= */
+app.listen(3000, () => {
+    console.log("Server is running on port 3000");
+});
