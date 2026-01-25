@@ -109,7 +109,7 @@ export function isCustomer(req) {
     return true;
 }
 
-/* ================= GOOGLE LOGIN FIX ================= */
+/* ================= GOOGLE LOGIN  ================= */
 
 export async function googleLogin(req, res) {
     const token = req.body.token;
