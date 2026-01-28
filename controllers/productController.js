@@ -5,7 +5,7 @@ import { isAdmin } from "./userController.js";
 
 export async function createProducts(req, res) {
 
-    if(!isAdmin(req)){
+    if (!isAdmin(req)) {
         res.status(403).json({
             message: "Access denied! only admin can create product data"
         })
@@ -48,7 +48,7 @@ export async function getProducts(req, res) {
 
 export async function deleteProduct(req, res) {
 
-    if(!isAdmin(req)){
+    if (!isAdmin(req)) {
         res.status(403).json({
             message: "Access denied! only admin can delete product data"
         })
@@ -57,13 +57,13 @@ export async function deleteProduct(req, res) {
 
     try {
         const productID = req.params.productID;
-      await Product.deleteOne(
-        {productID: productID}
-    ); 
+        await Product.deleteOne(
+            { productID: productID }
+        );
         res.status(200).json({
             message: "Product deleted successfully",
 
-           
+
         });
     } catch (err) {
         console.error(err);
@@ -76,20 +76,20 @@ export async function deleteProduct(req, res) {
 
 export async function updateProduct(req, res) {
 
-    if(!isAdmin(req)){
+    if (!isAdmin(req)) {
         res.status(403).json({
             message: "Access denied! only admin can update product data"
         })
         return;
-    }   
+    }
 
     try {
         const productID = req.params.productID;
         const updateData = req.body;
-        await Product.updateOne({productID : productID},
-             updateData
+        await Product.updateOne({ productID: productID },
+            updateData
 
-        ); 
+        );
         res.status(200).json({
             message: "Product updated successfully",
             product: updateData,
@@ -105,23 +105,41 @@ export async function updateProduct(req, res) {
 export async function getProductById(req, res) {
     try {
         const productID = req.params.productID;
-        
+
         const product = await Product.findOne({
-             productID: productID
-             });
+            productID: productID
+        });
 
         if (product === null) {
             return res.status(404).json(
-                { 
+                {
                     message: "Product not found"
-                 });
-        } else  {
-        res.status(200).json(product);
+                });
+        } else {
+            res.status(200).json(product);
         }
     } catch (err) {
         res.status(500).json({
             message: "Error retrieving product  by ID",
             error: err.message,
         });
-    }   
+    }
+}
+
+export async function getProductsBySearch(req, res) {
+    try {
+        const searchQuery = req.params.query;
+        const products = await Product.find({
+
+            name: { $regex: searchQuery, $options: "i" }
+        }
+        );
+        res.status(200).json(products);
+    } catch (err) {
+        res.status(500).json({
+            message: "Error retrieving products by search",
+            error: err.message,
+        });
+    }
+
 }

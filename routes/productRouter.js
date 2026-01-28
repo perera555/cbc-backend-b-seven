@@ -1,18 +1,31 @@
-import express from 'express';
-import { createProducts, deleteProduct, getProductById, getProducts, updateProduct } from '../controllers/productController.js';
+import express from "express";
+import {
+  createProducts,
+  deleteProduct,
+  getProductById,
+  getProducts,
+  getProductsBySearch,
+  updateProduct,
+} from "../controllers/productController.js";
 
+const productRouter = express.Router();
 
-const productRouter = express.Router(); 
+// ✅ GET ALL PRODUCTS
+productRouter.get("/", getProducts);
 
-productRouter.get("/", getProducts )
+// ✅ SEARCH PRODUCTS (MOVE THIS UP)
+productRouter.get("/search/:query", getProductsBySearch);
 
-productRouter.post("/", createProducts)
+// ✅ CREATE PRODUCT
+productRouter.post("/", createProducts);
 
-productRouter.delete("/:productID", deleteProduct)
+// ✅ UPDATE PRODUCT
+productRouter.put("/:productID", updateProduct);
 
-productRouter.put("/:productID", updateProduct)
+// ✅ DELETE PRODUCT
+productRouter.delete("/:productID", deleteProduct);
 
-productRouter.get("/:productID", getProductById)
-
+// ✅ GET PRODUCT BY ID (KEEP THIS LAST)
+productRouter.get("/:productID", getProductById);
 
 export default productRouter;
