@@ -110,6 +110,8 @@ export function getUser(req, res) {
   res.json({ user: req.user });
 }
 
+/* ================= ROLE CHECKS ================= */
+
 export function isAdmin(req) {
   return req.user && req.user.role === "admin";
 }
@@ -117,6 +119,11 @@ export function isAdmin(req) {
 export function isCustomer(req) {
   return req.user && req.user.role === "user";
 }
+
+/* ✅ REQUIRED EXPORT — NO LOGIC CHANGE */
+export const iscustomer = isCustomer;
+
+/* ================= ADMIN ================= */
 
 export async function getAllUsers(req, res) {
   if (!isAdmin(req))
@@ -271,40 +278,41 @@ export async function changePassswordViaOTP(req, res) {
 }
 
 export async function updateuserData(req, res) {
-    if (!req.user)
-        return res.status(401).json({ message: "Unauthorized" });
+  if (!req.user)
+    return res.status(401).json({ message: "Unauthorized" });
 
-    try {
-        await User.updateOne(
-            { email: req.user.email },
-            {
-                firstName: req.body.firstName,
-                lastName: req.body.lastName,
-                image: req.body.image,
-            }
-        );
+  try {
+    await User.updateOne(
+      { email: req.user.email },
+      {
+        firstName: req.body.firstName,
+        lastName: req.body.lastName,
+        image: req.body.image,
+      }
+    );
 
-        const updatedUser = await User.findOne({ email: req.user.email });
+    const updatedUser = await User.findOne({ email: req.user.email });
 
-        res.status(200).json({
-            message: "User data updated successfully",
-            user: updatedUser,
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Error updating user data" });
-    }
+    res.status(200).json({
+      message: "User data updated successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error updating user data" });
+  }
 }
 
-
-
-
 export async function upadtePassword(req, res) {
-  if (req.user==null)
-    return res.status(403).json({ message: "Forbidden: Admins only" })
+  if (req.user == null)
+    return res.status(403).json({ message: "Forbidden: Admins only" });
+
   try {
     const hashedpassword = bcrypt.hashSync(req.body.password, 10);
-    await User.updateOne({ email: req.user.email }, { password: hashedpassword });
+    await User.updateOne(
+      { email: req.user.email },
+      { password: hashedpassword }
+    );
 
     res.status(200).json({
       message: "Password updated successfully",
@@ -312,6 +320,5 @@ export async function upadtePassword(req, res) {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error updating password" });
-  } 
+  }
 }
-

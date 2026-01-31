@@ -10,7 +10,6 @@ import userRouter from "./routes/userRouter.js";
 import productRouter from "./routes/productRouter.js";
 import reviewRouter from "./routes/reviewRouter.js";
 import orderRouter from "./routes/orderRouter.js";
-import paymentRouter from "./routes/paymentRouter.js";
 
 /* ================= CONFIG ================= */
 dotenv.config();
@@ -20,22 +19,25 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-/* ================= AUTH MIDDLEWARE (UNCHANGED) ================= */
+/* ================= GLOBAL JWT MIDDLEWARE ================= */
 app.use((req, res, next) => {
-  let token = req.header("Authorization");
+  const authHeader = req.headers.authorization;
 
-  if (token) {
-    token = token.replace("Bearer ", "");
-    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
-      if (decoded == null) {
-        return res.status(401).json({
-          message: "Invalid Token please login again",
-        });
-      }
-      req.user = decoded;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return next(); // public route
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded; // ✅ attach user
+    next();
+  } catch (err) {
+    return res.status(401).json({
+      message: "Invalid token, please login again",
     });
   }
-  next();
 });
 
 /* ================= CONTEXT MIDDLEWARE ================= */
@@ -60,6 +62,7 @@ function adminOnly(req, res, next) {
       message: "Access denied – admin only",
     });
   }
+
   next();
 }
 
@@ -77,26 +80,21 @@ app.use("/api/users", userRouter);
 // students (logged users)
 app.use("/api/students", userContext, studentRouter);
 
-// products (GET = public, others = admin only)
+// products
 app.use(
   "/api/products",
   (req, res, next) => {
-    if (req.method === "GET") {
-      return next();
-    }
+    if (req.method === "GET") return next();
     return adminOnly(req, res, next);
   },
   productRouter
 );
 
-// orders (logged users)
+// orders + payments (logged users)
 app.use("/api/orders", userContext, orderRouter);
 
 // reviews (public)
 app.use("/api/reviews", reviewRouter);
-
-// payments (logged users)
-app.use("/api/payment", userContext, paymentRouter);
 
 /* ================= HEALTH CHECK ================= */
 app.get("/", (req, res) => {

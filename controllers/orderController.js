@@ -1,14 +1,20 @@
 import Order from "../models/order.js";
 import Product from "../models/product.js";
-import { isAdmin } from "./userController.js";
+import { isAdmin, iscustomer } from "./userController.js";
+
+/* =====================================================
+   CREATE ORDER
+   ===================================================== */
 
 export async function createOrder(req, res) {
   try {
     const user = req.user;
+
     if (!user) {
       return res.status(401).json({ message: "Unauthorized User" });
     }
 
+    // Generate order ID
     const orderList = await Order.find().sort({ date: -1 }).limit(1);
 
     let newOrderID = "CBC0000001";
@@ -18,6 +24,7 @@ export async function createOrder(req, res) {
       newOrderID = "CBC" + nextID;
     }
 
+    // Customer info
     let customerName = req.body.customerName;
     if (!customerName) {
       customerName = user.firstName + " " + user.lastName;
@@ -25,6 +32,7 @@ export async function createOrder(req, res) {
 
     let phone = req.body.phone || "Not Provided";
 
+    // Validate items
     const itemsInRequest = req.body.items;
     if (!Array.isArray(itemsInRequest)) {
       return res.status(400).json({ message: "Items should be an array" });
@@ -64,6 +72,7 @@ export async function createOrder(req, res) {
       total += product.price * item.quantity;
     }
 
+    // Create order
     const newOrder = new Order({
       orderID: newOrderID,
       Item: itemsToBeAdded,
@@ -72,50 +81,66 @@ export async function createOrder(req, res) {
       phone,
       address: req.body.address,
       total,
-
     });
 
     await newOrder.save();
-    // order count
-    for (let i= 0; i<itemsToBeAdded.length; i++) {
-      const item =itemsToBeAdded[i]
-      await Product.updateOne(
-        {productID:item.productID},
-        {$inc:{stock:-item.quantity}}
-      )
 
+    // Update product stock
+    for (let i = 0; i < itemsToBeAdded.length; i++) {
+      const item = itemsToBeAdded[i];
+      await Product.updateOne(
+        { productID: item.productID },
+        { $inc: { stock: -item.quantity } }
+      );
     }
 
-    res.status(201).json({ message: "Order Created Successfully" });
+    res.status(201).json({
+      message: "Order Created Successfully",
+      orderID: newOrderID,
+    });
+
   } catch (err) {
-    console.error(err);
+    console.error("CREATE ORDER ERROR:", err);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
+
+/* =====================================================
+   GET ORDERS
+   ===================================================== */
+
 export async function getOrders(req, res) {
-  if (isAdmin(req)) {
-    const orders = await Order.find().sort({ date: -1 })
-    res.json(orders)
+  try {
+    if (isAdmin(req)) {
+      const orders = await Order.find().sort({ date: -1 });
+      return res.json(orders);
+    }
 
-  } else if (iscustomer(req)) {
-    const user = req.user
-    const orders = await Order.find({ email: user.email }).sort({ date: -1 })
-    res.json(orders)
+    if (iscustomer(req)) {
+      const user = req.user;
+      const orders = await Order.find({ email: user.email }).sort({ date: -1 });
+      return res.json(orders);
+    }
 
-  } else {
-    res.status(403).json({
-      message: "you are not Authorized tho view orders"
-    })
+    return res.status(403).json({
+      message: "You are not authorized to view orders",
+    });
+
+  } catch (err) {
+    console.error("GET ORDERS ERROR:", err);
+    res.status(500).json({ message: "Failed to retrieve orders" });
   }
 }
 
-export async function updateorderstatus(req, res) {
+/* =====================================================
+   UPDATE ORDER STATUS (ADMIN)
+   ===================================================== */
 
+export async function updateorderstatus(req, res) {
   if (!isAdmin(req)) {
-    res.status(403).json({
-      message: "you are not Authorized to update order"
+    return res.status(403).json({
+      message: "You are not authorized to update order status",
     });
-    return;
   }
 
   try {
@@ -123,18 +148,65 @@ export async function updateorderstatus(req, res) {
     const newstatus = req.body.status;
 
     await Order.updateOne(
-      { orderID: orderID },
+      { orderID },
       { $set: { status: newstatus } }
     );
 
     res.json({
-      message: "Order status updated successfully"
+      message: "Order status updated successfully",
     });
 
   } catch (err) {
-    console.error("UPDATE ERROR:", err);
+    console.error("UPDATE STATUS ERROR:", err);
     res.status(500).json({
-      message: "failed to update order status"
+      message: "Failed to update order status",
     });
+  }
+}
+
+/* =====================================================
+   PAY ORDER
+   ===================================================== */
+
+export async function payOrder(req, res) {
+  try {
+    const user = req.user;
+
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized User" });
+    }
+
+    const orderID = req.params.orderID;
+    const order = await Order.findOne({ orderID });
+
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+
+    // Only owner or admin can pay
+    if (order.email !== user.email && !isAdmin(req)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    if (order.paymentStatus === "PAID") {
+      return res.status(400).json({ message: "Order already paid" });
+    }
+
+    // Update payment
+    order.paymentStatus = "PAID";
+    order.paymentMethod = req.body.paymentMethod || "CARD";
+    order.paidAt = new Date();
+    order.paymentReference = req.body.paymentReference || null;
+
+    await order.save();
+
+    res.status(200).json({
+      message: "Payment successful",
+      order,
+    });
+
+  } catch (err) {
+    console.error("PAYMENT ERROR:", err);
+    res.status(500).json({ message: "Payment failed" });
   }
 }

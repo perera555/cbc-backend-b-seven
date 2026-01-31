@@ -1,34 +1,38 @@
-import express from 'express';
-import { blockOrUnblockUser, changePassswordViaOTP, createUser, getAllUsers, getUser, getUsers, googleLogin, loginUser, sentOTP, upadtePassword, updateuserData } from '../controllers/userController.js';
+import express from "express";
 
+import {
+  createUser,
+  loginUser,
+  getUsers,
+  getUser,
+  getAllUsers,
+  blockOrUnblockUser,
+  sentOTP,
+  changePassswordViaOTP,
+  updateuserData,
+  upadtePassword
+} from "../controllers/userController.js";
 
 const userRouter = express.Router();
 
+/* ================= AUTH ================= */
+userRouter.post("/register", createUser);
+userRouter.post("/login", loginUser);
 
-userRouter.get('/', getUsers);
+/* ================= USER ================= */
+userRouter.get("/me", getUser);
+userRouter.get("/", getUsers);
+userRouter.get("/all", getAllUsers);
 
-userRouter.post("/", createUser)
-
-userRouter.post("/login", loginUser)
-
-userRouter.get("/me", getUser)
-
-userRouter.post("/google-login", googleLogin)
-
-userRouter.get('/all-users', getAllUsers);
-
-userRouter.put('/block/:email', blockOrUnblockUser);
-
-userRouter.get('/send-otp/', sentOTP);
-
+/* ================= OTP / PASSWORD ================= */
+userRouter.post("/otp", sentOTP);
 userRouter.post("/reset-password", changePassswordViaOTP);
+userRouter.put("/password", upadtePassword);
 
-userRouter.put("/me/password", upadtePassword);
+/* ================= PROFILE ================= */
+userRouter.put("/update", updateuserData);
 
-userRouter.put("/me", updateuserData);
+/* ================= ADMIN ================= */
+userRouter.put("/block/:email", blockOrUnblockUser);
 
- 
-
-
- 
-export default userRouter;  
+export default userRouter;
