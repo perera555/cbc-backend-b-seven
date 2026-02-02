@@ -219,9 +219,10 @@ export async function googleLogin(req, res) {
 }
 
 /* ================= OTP ================= */
+/* 🔧 ONLY FIX IS HERE */
 
 export async function sentOTP(req, res) {
-  const email = req.query?.email;
+  const email = req.query?.email || req.body?.email; // ✅ FIXED
 
   if (!email)
     return res.status(400).json({ message: "Email is required" });
@@ -247,7 +248,7 @@ export async function sentOTP(req, res) {
       message: "OTP sent to your email successfully",
     });
   } catch (error) {
-    console.error(error);
+    console.error("OTP ERROR:", error);
     res.status(500).json({ message: "Error sending OTP" });
   }
 }
@@ -276,6 +277,8 @@ export async function changePassswordViaOTP(req, res) {
     res.status(500).json({ message: "Error changing password" });
   }
 }
+
+/* ================= PROFILE ================= */
 
 export async function updateuserData(req, res) {
   if (!req.user)
