@@ -85,7 +85,6 @@ mongoose
 
 // users (public)
 app.use("/api/users", userRouter);
-
 // students (logged users)
 app.use("/api/students", userContext, studentRouter);
 

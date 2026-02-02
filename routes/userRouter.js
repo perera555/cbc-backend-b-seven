@@ -3,6 +3,7 @@ import express from "express";
 import {
   createUser,
   loginUser,
+  googleLogin,          // ✅ ADD THIS
   getUsers,
   getUser,
   getAllUsers,
@@ -18,6 +19,7 @@ const userRouter = express.Router();
 /* ================= AUTH ================= */
 userRouter.post("/register", createUser);
 userRouter.post("/login", loginUser);
+userRouter.post("/google-login", googleLogin); // ✅ ADD THIS
 
 /* ================= USER ================= */
 userRouter.get("/me", getUser);

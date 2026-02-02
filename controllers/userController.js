@@ -16,14 +16,10 @@ const companyName = "Crystal Beauty Clear";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.APP_PASSWORD,
   },
-  tls: { rejectUnauthorized: false },
 });
 
 /* ================= AUTH ================= */
@@ -52,7 +48,7 @@ export function createUser(req, res) {
 export function loginUser(req, res) {
   User.findOne({ email: req.body.email }).then((user) => {
     if (!user)
-      return res.status(404).json({ message: "user not found" });
+      return res.status(404).json({ message: "User not found" });
 
     if (user.isblocked)
       return res.status(403).json({
@@ -65,7 +61,7 @@ export function loginUser(req, res) {
     );
 
     if (!isPasswordMatching)
-      return res.status(401).json({ message: "incorrect password" });
+      return res.status(401).json({ message: "Incorrect password" });
 
     const token = jwt.sign(
       {
@@ -80,7 +76,7 @@ export function loginUser(req, res) {
     );
 
     res.status(200).json({
-      message: "login successful",
+      message: "Login successful",
       token,
       user: {
         email: user.email,
@@ -91,6 +87,89 @@ export function loginUser(req, res) {
       },
     });
   });
+}
+
+/* ================= GOOGLE LOGIN (FIXED) ================= */
+
+export async function googleLogin(req, res) {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: "Google token missing" });
+    }
+
+    // Verify token with Google
+    const googleRes = await axios.get(
+      "https://www.googleapis.com/oauth2/v3/userinfo",
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const {
+      email,
+      given_name,
+      family_name,
+      picture,
+    } = googleRes.data;
+
+    let user = await User.findOne({ email });
+
+    // Create user if not exists
+    if (!user) {
+      user = await User.create({
+        email,
+        firstName: given_name || "Google",
+        lastName: family_name || "User",
+        password: bcrypt.hashSync(
+          Math.random().toString(36),
+          10
+        ),
+        role: "user",
+        isEmailVerified: true,
+        image: picture,
+      });
+    }
+
+    if (user.isblocked) {
+      return res.status(403).json({
+        message: "User is blocked. Please contact support.",
+      });
+    }
+
+    // Create JWT (same pattern as loginUser)
+    const jwtToken = jwt.sign(
+      {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
+        image: user.image,
+      },
+      process.env.JWT_SECRET
+    );
+
+    res.status(200).json({
+      message: "Google login successful",
+      token: jwtToken,
+      user: {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        isEmailVerified: user.isEmailVerified,
+      },
+    });
+  } catch (error) {
+    console.error("GOOGLE LOGIN ERROR:", error);
+    res.status(401).json({
+      message: "Google authentication failed",
+    });
+  }
 }
 
 /* ================= USERS ================= */
@@ -120,7 +199,6 @@ export function isCustomer(req) {
   return req.user && req.user.role === "user";
 }
 
-/* ✅ REQUIRED EXPORT — NO LOGIC CHANGE */
 export const iscustomer = isCustomer;
 
 /* ================= ADMIN ================= */
@@ -162,67 +240,10 @@ export async function blockOrUnblockUser(req, res) {
   }
 }
 
-/* ================= GOOGLE LOGIN ================= */
-
-export async function googleLogin(req, res) {
-  const token = req.body.token;
-  if (!token)
-    return res.status(400).json({ message: "Token is required" });
-
-  try {
-    const googleResponse = await axios.get(
-      "https://www.googleapis.com/oauth2/v3/userinfo",
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
-
-    const googleUser = googleResponse.data;
-
-    let user = await User.findOne({ email: googleUser.email });
-
-    if (!user) {
-      user = await new User({
-        email: googleUser.email,
-        firstName: googleUser.given_name,
-        lastName: googleUser.family_name,
-        password: "abc",
-        isEmailVerified: googleUser.email_verified,
-        image: googleUser.picture,
-      }).save();
-    }
-
-    if (user.isblocked)
-      return res
-        .status(403)
-        .json({ message: "User is blocked. Please contact support." });
-
-    const jwtToken = jwt.sign(
-      {
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        isEmailVerified: user.isEmailVerified,
-        image: user.image,
-      },
-      process.env.JWT_SECRET
-    );
-
-    res.status(200).json({
-      message: "Google login successful",
-      token: jwtToken,
-      user,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Error during Google login" });
-  }
-}
-
 /* ================= OTP ================= */
-/* 🔧 ONLY FIX IS HERE */
 
 export async function sentOTP(req, res) {
-  const email = req.query?.email || req.body?.email; // ✅ FIXED
+  const email = req.body.email || req.query.email;
 
   if (!email)
     return res.status(400).json({ message: "Email is required" });
@@ -231,7 +252,7 @@ export async function sentOTP(req, res) {
 
   try {
     await OTP.deleteMany({ email });
-    await new OTP({ email, otp }).save();
+    await OTP.create({ email, otp });
 
     await transporter.sendMail({
       from: `"${companyName}" <${process.env.EMAIL_USER}>`,
@@ -244,9 +265,7 @@ export async function sentOTP(req, res) {
       }),
     });
 
-    res.status(200).json({
-      message: "OTP sent to your email successfully",
-    });
+    res.status(200).json({ message: "OTP sent successfully" });
   } catch (error) {
     console.error("OTP ERROR:", error);
     res.status(500).json({ message: "Error sending OTP" });
@@ -307,8 +326,8 @@ export async function updateuserData(req, res) {
 }
 
 export async function upadtePassword(req, res) {
-  if (req.user == null)
-    return res.status(403).json({ message: "Forbidden: Admins only" });
+  if (!req.user)
+    return res.status(403).json({ message: "Forbidden" });
 
   try {
     const hashedpassword = bcrypt.hashSync(req.body.password, 10);
