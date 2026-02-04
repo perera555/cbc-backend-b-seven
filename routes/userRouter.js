@@ -19,7 +19,7 @@ const userRouter = express.Router();
 /* ================= AUTH ================= */
 userRouter.post("/register", createUser);
 userRouter.post("/login", loginUser);
-userRouter.post("/google-login", googleLogin); // ✅ ADD THIS
+userRouter.post("/google-login", googleLogin);
 
 /* ================= USER ================= */
 userRouter.get("/me", getUser);

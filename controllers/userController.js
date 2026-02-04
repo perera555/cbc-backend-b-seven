@@ -1,3 +1,4 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 import axios from "axios";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
@@ -20,7 +21,7 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.APP_PASSWORD,
   },
-});
+}); 
 
 /* ================= AUTH ================= */
 
@@ -89,7 +90,7 @@ export function loginUser(req, res) {
   });
 }
 
-/* ================= GOOGLE LOGIN (FIXED) ================= */
+/* ================= GOOGLE LOGIN ================= */
 
 export async function googleLogin(req, res) {
   try {
@@ -99,7 +100,6 @@ export async function googleLogin(req, res) {
       return res.status(400).json({ message: "Google token missing" });
     }
 
-    // Verify token with Google
     const googleRes = await axios.get(
       "https://www.googleapis.com/oauth2/v3/userinfo",
       {
@@ -109,25 +109,16 @@ export async function googleLogin(req, res) {
       }
     );
 
-    const {
-      email,
-      given_name,
-      family_name,
-      picture,
-    } = googleRes.data;
+    const { email, given_name, family_name, picture } = googleRes.data;
 
     let user = await User.findOne({ email });
 
-    // Create user if not exists
     if (!user) {
       user = await User.create({
         email,
         firstName: given_name || "Google",
         lastName: family_name || "User",
-        password: bcrypt.hashSync(
-          Math.random().toString(36),
-          10
-        ),
+        password: bcrypt.hashSync(Math.random().toString(36), 10),
         role: "user",
         isEmailVerified: true,
         image: picture,
@@ -140,7 +131,6 @@ export async function googleLogin(req, res) {
       });
     }
 
-    // Create JWT (same pattern as loginUser)
     const jwtToken = jwt.sign(
       {
         email: user.email,
@@ -166,9 +156,7 @@ export async function googleLogin(req, res) {
     });
   } catch (error) {
     console.error("GOOGLE LOGIN ERROR:", error);
-    res.status(401).json({
-      message: "Google authentication failed",
-    });
+    res.status(401).json({ message: "Google authentication failed" });
   }
 }
 
@@ -240,10 +228,12 @@ export async function blockOrUnblockUser(req, res) {
   }
 }
 
-/* ================= OTP ================= */
+/* ================= OTP (FIXED) ================= */
 
 export async function sentOTP(req, res) {
-  const email = req.body.email || req.query.email;
+  const email = (req.body.email || req.query.email)
+    ?.toLowerCase()
+    .trim();
 
   if (!email)
     return res.status(400).json({ message: "Email is required" });
@@ -251,11 +241,15 @@ export async function sentOTP(req, res) {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
   try {
-    await OTP.deleteMany({ email });
-    await OTP.create({ email, otp });
+    // ✅ atomic upsert (fixes unique + mismatch bugs)
+    await OTP.findOneAndUpdate(
+      { email },
+      { otp },
+      { upsert: true, new: true }
+    );
 
     await transporter.sendMail({
-      from: `"${companyName}" <${process.env.EMAIL_USER}>`,
+      from: `${process.env.EMAIL_USER}`,
       to: email,
       subject: "Your One-Time Password (OTP)",
       html: getDesignEmail({
@@ -273,17 +267,24 @@ export async function sentOTP(req, res) {
 }
 
 export async function changePassswordViaOTP(req, res) {
-  const { email, otp, newPassword } = req.body;
+  const email = req.body.email?.toLowerCase().trim();
+  const otp = req.body.otp?.trim();
+  const { newPassword } = req.body;
 
   try {
-    const otpRecord = await OTP.findOne({ email, otp });
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: "Invalid request data" });
+    }
 
-    if (!otpRecord)
+    const otpRecord = await OTP.findOne({ email });
+
+    if (!otpRecord || otpRecord.otp !== otp) {
       return res
         .status(400)
         .json({ message: "Invalid OTP or email" });
+    }
 
-    await OTP.deleteMany({ email });
+    await OTP.deleteOne({ email });
 
     const hashedpassword = bcrypt.hashSync(newPassword, 10);
     await User.updateOne({ email }, { password: hashedpassword });
@@ -292,7 +293,7 @@ export async function changePassswordViaOTP(req, res) {
       message: "Password changed successfully",
     });
   } catch (error) {
-    console.error(error);
+    console.error("RESET PASSWORD ERROR:", error);
     res.status(500).json({ message: "Error changing password" });
   }
 }
